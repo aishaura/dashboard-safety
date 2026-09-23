@@ -1,0 +1,12 @@
+[
+  {
+    "id": "sync-1790148335926",
+    "sourceName": "Unified Multi-Source Sync (BMKG, FIRMS, Open-Meteo, Curated)",
+    "startedAt": "2026-09-23T07:25:27.990Z",
+    "endedAt": "2026-09-23T07:25:35.926Z",
+    "status": "SUCCESS",
+    "recordsFetched": 103,
+    "recordsInserted": 95,
+    "recordsUpdated": 8
+  }
+]
