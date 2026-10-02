@@ -13,6 +13,8 @@ import SafetyInsightsPanel from '@/components/SafetyInsightsPanel';
 import WebinarMode from '@/components/WebinarMode';
 import { SafetyEvent, RegionSafetyProfile, SafetyInsight } from '@/types/safety';
 import { parseSearchQuery } from '@/lib/search-parser';
+import { findLocationInfo } from '@/lib/indonesia-locations';
+import { SearchedLocation } from '@/components/Map/SafetyMap';
 import {
   ShieldAlert,
   AlertTriangle,
@@ -29,6 +31,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [insights, setInsights] = useState<SafetyInsight[]>([]);
   const [bandungProfile, setBandungProfile] = useState<RegionSafetyProfile | null>(null);
+  const [searchedLocation, setSearchedLocation] = useState<SearchedLocation | null>(null);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -84,32 +87,72 @@ export default function DashboardPage() {
     fetchData();
   }, [fetchData]);
 
+  // Handle Category Selection (from FilterBar, Stats, or Charts)
+  const handleCategorySelect = (cat: string) => {
+    setSelectedCategory(cat);
+    if (cat !== 'ALL') {
+      // Clear location constraints if present so category events across Indonesia are visible
+      if (searchedLocation || searchQuery) {
+        setSearchedLocation(null);
+        setSearchQuery('');
+      }
+      setMapCenter([-2.5, 118.0]);
+      setMapZoom(5);
+      setActiveFilterDescription(`Kategori: ${cat} (Pantauan Spasial Nasional)`);
+    } else {
+      setActiveFilterDescription('');
+    }
+  };
+
   // Handle Search Input or Quick Chips
   const handleSearch = (rawQuery: string) => {
     const parsed = parseSearchQuery(rawQuery);
-    setSearchQuery(rawQuery);
 
+    // If query is purely a category (e.g. "Titik Api", "Gempa", "Banjir") without location
+    if (parsed.category && !parsed.location) {
+      setSelectedCategory(parsed.category);
+      setSearchQuery('');
+      setSearchedLocation(null);
+      setMapCenter([-2.5, 118.0]);
+      setMapZoom(5);
+      setActiveFilterDescription(`Kategori: ${parsed.category} (Pantauan Spasial Nasional)`);
+      return;
+    }
+
+    setSearchQuery(rawQuery);
     let desc = `Pencarian: "${rawQuery}"`;
 
-    // If query is specifically "Bandung", show Bandung Profile Drawer!
-    if (parsed.isLocationProfileSearch && parsed.location?.toLowerCase().includes('bandung')) {
-      if (bandungProfile) {
-        setActiveProfile(bandungProfile);
-      }
-      setMapCenter([-6.9175, 107.6191]);
-      setMapZoom(12);
-      desc += ' → Membuka Safety Profile Wilayah Bandung';
+    // Check if location matches known Indonesian cities/regions (e.g. Balikpapan, Banten, Surabaya, Jakarta, Bandung, etc.)
+    const locTarget = parsed.location;
+    const locInfo = locTarget ? findLocationInfo(locTarget) : findLocationInfo(rawQuery);
+
+    if (locInfo) {
+      setSearchedLocation({
+        name: locInfo.name,
+        coordinates: locInfo.coordinates,
+        zoom: locInfo.zoom,
+        province: locInfo.province,
+      });
+      setMapCenter(locInfo.coordinates);
+      setMapZoom(locInfo.zoom);
+    } else {
+      setSearchedLocation(null);
+    }
+
+    // Handle profile drawer request for any city (e.g. "profil bandung", "profil samarinda")
+    if (parsed.isLocationProfileSearch) {
+      const targetCity = parsed.location || locInfo?.name || rawQuery;
+      handleOpenCityProfile(targetCity);
+      desc += ` → Membuka Safety Profile ${targetCity}`;
     } else {
       if (parsed.category) {
         setSelectedCategory(parsed.category);
         desc += ` [Kategori: ${parsed.category}]`;
       }
-      if (parsed.location) {
+      if (locInfo) {
+        desc += ` [Lokasi: ${locInfo.name}]`;
+      } else if (parsed.location) {
         desc += ` [Lokasi: ${parsed.location}]`;
-        if (parsed.location.toLowerCase().includes('bandung')) {
-          setMapCenter([-6.9175, 107.6191]);
-          setMapZoom(11);
-        }
       }
       if (parsed.year) {
         desc += ` [Tahun: ${parsed.year}]`;
@@ -122,15 +165,38 @@ export default function DashboardPage() {
     setActiveFilterDescription(desc);
   };
 
+  // Open Safety Profile for any city dynamically
+  const handleOpenCityProfile = async (cityName?: string) => {
+    const target = cityName || searchedLocation?.name || 'Bandung';
+    try {
+      const res = await fetch(`/api/regions/${encodeURIComponent(target)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.profile) {
+          setActiveProfile(data.profile);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load region profile:', err);
+    }
+  };
+
+  // Clear Searched City / Exit Pointer -> Smooth Zoom Out to National & Restore all markers
+  const handleClearSearchedLocation = useCallback(() => {
+    setSearchedLocation(null);
+    setSearchQuery('');
+    setActiveFilterDescription('');
+    setMapCenter([-2.5, 118.0]);
+    setMapZoom(5);
+  }, []);
+
   // Reset Filters
   const handleResetFilters = () => {
     setSelectedCategory('ALL');
     setSelectedSeverity('ALL');
     setSelectedTemporalStatus('ALL');
-    setSearchQuery('');
-    setActiveFilterDescription('');
-    setMapCenter([-2.5, 118.0]);
-    setMapZoom(5);
+    handleClearSearchedLocation();
   };
 
   // Sync Live Data from BMKG / FIRMS
@@ -186,7 +252,7 @@ export default function DashboardPage() {
         onToggleWebinarMode={() => setIsWebinarMode(true)}
         onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
-        lastUpdated={stats?.latestUpdated || new Date().toISOString()}
+        lastUpdated={stats?.latestUpdated || ''}
       />
 
       {/* Main Container */}
@@ -218,7 +284,7 @@ export default function DashboardPage() {
           <StatsOverview
             stats={stats}
             onSelectSeverity={(sev) => setSelectedSeverity(sev)}
-            onSelectCategory={(cat) => setSelectedCategory(cat)}
+            onSelectCategory={(cat) => handleCategorySelect(cat)}
           />
         )}
 
@@ -227,7 +293,7 @@ export default function DashboardPage() {
           selectedCategory={selectedCategory}
           selectedSeverity={selectedSeverity}
           selectedTemporalStatus={selectedTemporalStatus}
-          onSelectCategory={setSelectedCategory}
+          onSelectCategory={handleCategorySelect}
           onSelectSeverity={setSelectedSeverity}
           onSelectTemporalStatus={setSelectedTemporalStatus}
           onResetFilters={handleResetFilters}
@@ -246,27 +312,65 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* Quick Focus Buttons */}
+          {/* Quick Focus & Presets Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleFocusBandung}
-              className="px-3 py-1.5 rounded-lg bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 border border-blue-700/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow"
-            >
-              <MapPin className="w-3.5 h-3.5 text-blue-400" />
-              <span>Fokus Bandung & Profil</span>
-            </button>
+            {searchedLocation ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleOpenCityProfile(searchedLocation.name)}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Profil {searchedLocation.name.replace(/^(Kota|Kabupaten)\s+/i, '')}</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMapCenter([-2.5, 118.0]);
-                setMapZoom(5);
-              }}
-              className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium transition-colors"
-            >
-              Reset Nasional
-            </button>
+                <button
+                  type="button"
+                  onClick={handleClearSearchedLocation}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                >
+                  <span>🌐 Zoom Out ke Nasional</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleSearch('Bandung')}
+                  className="px-3 py-1.5 rounded-lg bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 border border-blue-700/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Bandung</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSearch('Surabaya')}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-900/40 hover:bg-indigo-800/60 text-indigo-300 border border-indigo-700/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Surabaya</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSearch('Samarinda')}
+                  className="px-3 py-1.5 rounded-lg bg-purple-900/40 hover:bg-purple-800/60 text-purple-300 border border-purple-700/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Samarinda</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearSearchedLocation}
+                  className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Reset Nasional
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -279,6 +383,9 @@ export default function DashboardPage() {
               onSelectEvent={(e) => setSelectedEvent(e)}
               center={mapCenter}
               zoom={mapZoom}
+              searchedLocation={searchedLocation}
+              onClearSearchedLocation={handleClearSearchedLocation}
+              onOpenCityProfile={handleOpenCityProfile}
             />
           </div>
 
@@ -287,9 +394,8 @@ export default function DashboardPage() {
               events={events}
               selectedEvent={selectedEvent}
               onSelectEvent={handleSelectEvent}
-              onOpenSafetyProfile={() => {
-                if (bandungProfile) setActiveProfile(bandungProfile);
-              }}
+              activeLocationName={searchedLocation?.name}
+              onOpenSafetyProfile={handleOpenCityProfile}
             />
           </div>
         </div>
@@ -306,7 +412,7 @@ export default function DashboardPage() {
             categoryDistribution={stats.categoryDistribution}
             severityDistribution={stats.severityDistribution}
             monthlyTrend={stats.monthlyTrend}
-            onSelectCategory={(cat) => setSelectedCategory(cat)}
+            onSelectCategory={(cat) => handleCategorySelect(cat)}
           />
         )}
       </main>
@@ -361,6 +467,8 @@ export default function DashboardPage() {
           onClose={() => setIsWebinarMode(false)}
           events={events}
           stats={stats}
+          activeRegionName={searchedLocation?.name || searchQuery || 'Nasional'}
+          searchedLocation={searchedLocation}
           bandungProfile={bandungProfile}
           insights={insights}
         />

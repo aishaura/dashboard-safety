@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldAlert,
   Search,
@@ -23,12 +23,11 @@ interface NavbarProps {
 }
 
 const QUICK_CHIPS = [
-  { label: 'Bandung Profile', query: 'Bandung', icon: MapPin },
-  { label: 'Kecelakaan Bandung', query: 'Kecelakaan Bandung', icon: ShieldAlert },
-  { label: 'Banjir Bandung', query: 'Banjir Bandung', icon: ShieldAlert },
+  { label: 'Jakarta', query: 'Jakarta', icon: MapPin },
+  { label: 'Surabaya', query: 'Surabaya', icon: MapPin },
+  { label: 'Bandung', query: 'Bandung', icon: MapPin },
   { label: 'Gempa Terkini', query: 'Gempa', icon: Radio },
-  { label: 'Titik Api Satelit', query: 'Titik Api', icon: Sparkles },
-  { label: 'Kecelakaan September 2026', query: 'Kecelakaan Bandung September 2026', icon: Calendar },
+  { label: 'Titik Api', query: 'Titik Api', icon: Sparkles },
 ];
 
 export default function Navbar({
@@ -40,6 +39,30 @@ export default function Navbar({
   lastUpdated,
 }: NavbarProps) {
   const [searchInput, setSearchInput] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const formattedTime = useMemo(() => {
+    if (!mounted) return '--:--:-- WIB';
+    const targetDate = lastUpdated ? new Date(lastUpdated) : new Date();
+    if (isNaN(targetDate.getTime())) return '--:--:-- WIB';
+    return `${targetDate.toLocaleTimeString('id-ID')} WIB`;
+  }, [mounted, lastUpdated]);
+
+  const fullDateTooltip = useMemo(() => {
+    if (!mounted) return 'Waktu pembaruan data sistem';
+    const targetDate = lastUpdated ? new Date(lastUpdated) : new Date();
+    if (isNaN(targetDate.getTime())) return 'Waktu pembaruan data sistem';
+    return `Sinkronisasi terakhir: ${targetDate.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })} pukul ${targetDate.toLocaleTimeString('id-ID')} WIB`;
+  }, [mounted, lastUpdated]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,8 +142,12 @@ export default function Navbar({
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                 <span>Konektivitas Aktif</span>
               </div>
-              <span className="text-[10px] text-gray-500">
-                Pembaruan: {new Date(lastUpdated).toLocaleTimeString('id-ID')}
+              <span
+                className="text-[10px] text-gray-400 cursor-help hover:text-gray-300 transition-colors"
+                title={fullDateTooltip}
+                suppressHydrationWarning
+              >
+                Pembaruan: {formattedTime}
               </span>
             </div>
 
@@ -147,9 +174,9 @@ export default function Navbar({
         </div>
 
         {/* Quick Suggestion Chips */}
-        <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <span className="text-[11px] text-gray-400 font-medium shrink-0 flex items-center gap-1">
-            Pencarian Cepat:
+        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs no-scrollbar">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold shrink-0">
+            Fokus Cepat:
           </span>
           {QUICK_CHIPS.map((chip) => {
             const Icon = chip.icon;
@@ -158,7 +185,7 @@ export default function Navbar({
                 key={chip.query}
                 type="button"
                 onClick={() => handleChipClick(chip.query)}
-                className="px-2.5 py-1 rounded-full bg-gray-800/80 hover:bg-gray-700 border border-gray-700/80 text-gray-300 hover:text-white shrink-0 flex items-center gap-1.5 transition-colors text-[11px]"
+                className="px-2 py-0.5 rounded-md bg-gray-800/60 hover:bg-gray-700/80 border border-gray-700/50 text-gray-300 hover:text-white shrink-0 flex items-center gap-1 transition-all text-[11px]"
               >
                 <Icon className="w-3 h-3 text-blue-400" />
                 <span>{chip.label}</span>

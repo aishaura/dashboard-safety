@@ -4,12 +4,22 @@ import dynamic from 'next/dynamic';
 import React from 'react';
 import { SafetyEvent } from '@/types/safety';
 
+export interface SearchedLocation {
+  name: string;
+  coordinates: [number, number];
+  zoom?: number;
+  province?: string;
+}
+
 interface SafetyMapProps {
   events: SafetyEvent[];
   selectedEvent: SafetyEvent | null;
   onSelectEvent: (event: SafetyEvent) => void;
   center?: [number, number];
   zoom?: number;
+  searchedLocation?: SearchedLocation | null;
+  onClearSearchedLocation?: () => void;
+  onOpenCityProfile?: (cityName: string) => void;
 }
 
 const DynamicSafetyMapClient = dynamic(

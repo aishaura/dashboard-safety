@@ -21,7 +21,8 @@ interface EventFeedProps {
   events: SafetyEvent[];
   selectedEvent: SafetyEvent | null;
   onSelectEvent: (event: SafetyEvent) => void;
-  onOpenSafetyProfile?: (location: string) => void;
+  onOpenSafetyProfile?: (location?: string) => void;
+  activeLocationName?: string;
 }
 
 export default function EventFeed({
@@ -29,6 +30,7 @@ export default function EventFeed({
   selectedEvent,
   onSelectEvent,
   onOpenSafetyProfile,
+  activeLocationName,
 }: EventFeedProps) {
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -116,18 +118,32 @@ export default function EventFeed({
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col h-[540px] shadow-xl">
       {/* Header */}
-      <div className="p-3.5 border-b border-gray-800 bg-gray-900/90 flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>Daftar Kejadian Terkini & Arsip</span>
-            <span className="px-2 py-0.5 rounded-full bg-gray-800 text-xs text-blue-400 font-semibold border border-gray-700">
+      <div className="p-3.5 border-b border-gray-800 bg-gray-900/90 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2 truncate">
+            <span className="truncate">Daftar Kejadian {activeLocationName ? `• ${activeLocationName}` : ''}</span>
+            <span className="px-2 py-0.5 rounded-full bg-gray-800 text-xs text-blue-400 font-semibold border border-gray-700 shrink-0">
               {events.length}
             </span>
           </h3>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-gray-400 truncate">
             Klik entri untuk fokus peta dan melihat bukti sumber
           </p>
         </div>
+
+        {onOpenSafetyProfile && (
+          <button
+            onClick={() => onOpenSafetyProfile(activeLocationName)}
+            title={`Buka Profil Keselamatan ${activeLocationName || 'Wilayah'}`}
+            className="px-2.5 py-1.5 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all shadow shrink-0 cursor-pointer"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">
+              Profil {activeLocationName ? activeLocationName.replace(/^(Kota|Kabupaten)\s+/i, '') : 'Wilayah'}
+            </span>
+            <span className="sm:hidden">Profil</span>
+          </button>
+        )}
       </div>
 
       {/* List Feed */}

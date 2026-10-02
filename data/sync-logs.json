@@ -1,5 +1,35 @@
 [
   {
+    "id": "sync-1790937540861",
+    "sourceName": "Unified Multi-Source Sync (BMKG, FIRMS, Open-Meteo, Curated)",
+    "startedAt": "2026-10-02T10:39:00.615Z",
+    "endedAt": "2026-10-02T10:39:00.861Z",
+    "status": "SUCCESS",
+    "recordsFetched": 114,
+    "recordsInserted": 71,
+    "recordsUpdated": 43
+  },
+  {
+    "id": "sync-1790936885889",
+    "sourceName": "Unified Multi-Source Sync (BMKG, FIRMS, Open-Meteo, Curated)",
+    "startedAt": "2026-10-02T10:28:05.524Z",
+    "endedAt": "2026-10-02T10:28:05.889Z",
+    "status": "SUCCESS",
+    "recordsFetched": 115,
+    "recordsInserted": 10,
+    "recordsUpdated": 105
+  },
+  {
+    "id": "sync-1790219166475",
+    "sourceName": "Unified Multi-Source Sync (BMKG, FIRMS, Open-Meteo, Curated)",
+    "startedAt": "2026-09-24T03:06:06.164Z",
+    "endedAt": "2026-09-24T03:06:06.475Z",
+    "status": "SUCCESS",
+    "recordsFetched": 103,
+    "recordsInserted": 0,
+    "recordsUpdated": 103
+  },
+  {
     "id": "sync-1790148335926",
     "sourceName": "Unified Multi-Source Sync (BMKG, FIRMS, Open-Meteo, Curated)",
     "startedAt": "2026-09-23T07:25:27.990Z",

@@ -94,42 +94,8 @@ const MONTH_NAMES: Record<string, number> = {
   des: 12,
 };
 
-const KNOWN_LOCATIONS = [
-  'bandung',
-  'dayeuhkolot',
-  'baleendah',
-  'lembang',
-  'cipularang',
-  'padaleunyi',
-  'gedebage',
-  'pasteur',
-  'jakarta',
-  'bogor',
-  'depok',
-  'tangerang',
-  'bekasi',
-  'sukabumi',
-  'cianjur',
-  'garut',
-  'tasikmalaya',
-  'cirebon',
-  'surabaya',
-  'semarang',
-  'yogyakarta',
-  'malang',
-  'medan',
-  'padang',
-  'palembang',
-  'riau',
-  'bali',
-  'lombok',
-  'makassar',
-  'manado',
-  'papua',
-  'jawa barat',
-  'jawa tengah',
-  'jawa timur',
-];
+import { INDONESIA_LOCATIONS } from '@/lib/indonesia-locations';
+
 
 export function parseSearchQuery(rawQuery: string): ParsedSearchQuery {
   const query = rawQuery.toLowerCase().trim();
@@ -164,13 +130,14 @@ export function parseSearchQuery(rawQuery: string): ParsedSearchQuery {
     }
   }
 
-  // Also check two-word categories like "titik api" or "kualitas udara"
-  if (query.includes('titik api')) category = 'FIRE_HOTSPOT';
+  // Also check multi-word categories
+  if (query.includes('titik api') || query.includes('hotspot')) category = 'FIRE_HOTSPOT';
   if (query.includes('kualitas udara') || query.includes('polusi udara'))
     category = 'AIR_POLLUTION';
-  if (query.includes('gunung api')) category = 'VOLCANO';
+  if (query.includes('gunung api') || query.includes('gunung berapi')) category = 'VOLCANO';
   if (query.includes('cuaca ekstrem')) category = 'SEVERE_WEATHER';
-  if (query.includes('kecelakaan tol')) category = 'TRAFFIC_ACCIDENT';
+  if (query.includes('kecelakaan tol') || query.includes('laka lantas'))
+    category = 'TRAFFIC_ACCIDENT';
 
   // 4. Check for Severity keyword
   if (query.includes('kritis') || query.includes('critical') || query.includes('m6') || query.includes('m7')) {
@@ -179,9 +146,13 @@ export function parseSearchQuery(rawQuery: string): ParsedSearchQuery {
     severity = 'HIGH';
   }
 
-  // 5. Check for Location
-  for (const loc of KNOWN_LOCATIONS) {
-    if (query.includes(loc)) {
+  // 5. Check for Location using strict word boundaries and length-descending sort
+  // Prevents "balikpapan" from erroneously matching "bali", "banda aceh" matching before "aceh"
+  const sortedLocations = Object.keys(INDONESIA_LOCATIONS).sort((a, b) => b.length - a.length);
+  for (const loc of sortedLocations) {
+    const escaped = loc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(^|\\s|[^a-zA-Z0-9])${escaped}($|\\s|[^a-zA-Z0-9])`, 'i');
+    if (regex.test(query)) {
       location = loc.charAt(0).toUpperCase() + loc.slice(1);
       break;
     }
@@ -189,19 +160,41 @@ export function parseSearchQuery(rawQuery: string): ParsedSearchQuery {
 
   // If no known location detected but query contains unrecognized word besides category/date
   if (!location) {
+    const ignoredWords = new Set([
+      'di',
+      'pada',
+      'bulan',
+      'tahun',
+      'wilayah',
+      'kota',
+      'kabupaten',
+      'provinsi',
+      'titik',
+      'api',
+      'hotspot',
+      'gempa',
+      'terkini',
+      'terbaru',
+      'kejadian',
+      'bencana',
+      'laporan',
+    ]);
     const remaining = tokens.filter(
       (t) =>
         !CATEGORY_KEYWORDS[t] &&
         !MONTH_NAMES[t] &&
         !t.match(/^\d{4}$/) &&
-        !['di', 'pada', 'bulan', 'tahun', 'wilayah', 'kota', 'kabupaten'].includes(t)
+        !ignoredWords.has(t)
     );
     if (remaining.length > 0 && !category) {
       location = remaining.join(' ');
     }
   }
 
-  const isLocationProfileSearch = Boolean(location && !category && !year);
+  const isLocationProfileSearch = Boolean(
+    (query.includes('profil') || query.includes('profile') || query.includes('dossier')) &&
+    (location || query.replace(/^(profil|profile|dossier)\s+/i, '').trim().length > 0)
+  );
   const isSpecificEventSearch = Boolean(category && !location);
 
   return {
